@@ -17,20 +17,23 @@ import org.opencv.imgproc.Imgproc;
 
 public class CVGestureMouse {
 
+	private static final int CAPTURE_WIDTH = 320;
+	private static final int CAPTURE_HEIGHT = 240;
+	
 	public static void main(String[] args) throws Exception {
+		
+		// Set up opservation frame
 		JFrame frame = new JFrame("Webcam Capture");
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setSize(360, 280);
 		CameraViewPanel facePanel = new CameraViewPanel();
 		frame.setContentPane(facePanel);
 		
-		// Load native library
+		// Load native library, set up camera
 		System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
 		VideoCapture webCam = new VideoCapture(0);
-		webCam.set(Highgui.CV_CAP_PROP_FRAME_WIDTH, 320);
-		webCam.set(Highgui.CV_CAP_PROP_FRAME_HEIGHT, 240);
-		
-		
+		webCam.set(Highgui.CV_CAP_PROP_FRAME_WIDTH, CAPTURE_WIDTH);
+		webCam.set(Highgui.CV_CAP_PROP_FRAME_HEIGHT, CAPTURE_HEIGHT);
 		if (!webCam.isOpened()) {
 			System.out.println("Could not connect to camera.");
 		} else {
@@ -47,18 +50,14 @@ public class CVGestureMouse {
 			Mat img = new Mat();
 			Mat imgGray = new Mat();
 			Mat imgBinary = new Mat();
-//			Mat imgFlipped = new Mat();		
-			MatToBufImg matToBufferedImageConverter = new MatToBufImg(); // converts Mat to Java BufferedImage
+			MatToBufImg matToBufferedImageConverter = new MatToBufImg(); // converts Mat to Java BufferedImage for display
 			GestureClass currentClass;
+			Mouse mouse = new Mouse(CAPTURE_WIDTH, CAPTURE_HEIGHT);
 			
 			while (true) {
 				webCam.read(img);
 				if (!img.empty()) {
 					frameNo++;
-//					Thread.sleep(100); // Delay?
-					
-					// flip for mirror effect - not neccessary
-//					Core.flip(img, imgFlipped, 1);
 					
 					// threshold into a binary image
 					Imgproc.cvtColor(img, imgGray, Imgproc.COLOR_RGB2GRAY);
@@ -81,16 +80,13 @@ public class CVGestureMouse {
 								maxIndex = i;
 							}
 						}
-						
-						// smooth contour ?
-	//					Mat maxContour = new Mat();
-	//					Imgproc.blur(contours.get(maxIndex).t(), maxContour, new Size(1, 1001));
-						
+												
 						// Classify
 						currentClass = classifyContour(contours.get(maxIndex).toArray());
 						
 						// draw contour and output image to Frame
 						Imgproc.drawContours(img, contours, maxIndex, new Scalar(0,0,255), 2);
+						Core.putText(img, currentClass.name.name(), new Point(5.0,30.0), Core.FONT_HERSHEY_SIMPLEX, 1.0, new Scalar(0,0,255), 2);
 						
 					}
 					
@@ -112,6 +108,7 @@ public class CVGestureMouse {
 	}
 	
 	private static GestureClass classifyContour(Point[] contour) {
+		// TODO classification doesn't work - may need to rewrite and adjust thresholds
 		int peaks = 0, valleys = 0;
 		int k = 50; // distance from center point for getting vectors
 		if (contour.length <= k)
@@ -141,7 +138,7 @@ public class CVGestureMouse {
 		}
 		
 		for (int i = 0; i < angles.length; i++) {
-			// TODO - local extrema in angles, use them to increment peak and valley counts
+			
 			int K = 200;
 			if (angles.length > K && (angles[i] > peakThresh || angles[i] < valleyThresh)) {
 				// get neighborhood [i-k, i+k]

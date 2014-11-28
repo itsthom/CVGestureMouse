@@ -4,9 +4,9 @@ public class GestureClass {
 	public ClassName name;
 	
 	private static final int POINT_PEAKS_MIN_THRESHOLD = 0;
-	private static final int POINT_PEAKS_MAX_THRESHOLD = 0;
-	private static final int REACH_PEAKS_MIN_THRESHOLD = 0;
-	private static final int REACH_VALLEYS_MIN_THRESHOLD = 0;
+	private static final int POINT_PEAKS_MAX_THRESHOLD = 3;
+	private static final int REACH_PEAKS_MIN_THRESHOLD = 4;
+	private static final int REACH_VALLEYS_MIN_THRESHOLD = 4;
 	
 	public GestureClass() {
 		this.name = ClassName.UNCLASSIFIED;
