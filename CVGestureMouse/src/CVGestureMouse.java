@@ -82,7 +82,7 @@ public class CVGestureMouse {
 						}
 												
 						// Classify
-						currentClass = GestureClass.classifyContour(contours.get(maxIndex).toArray());
+						currentClass = GestureClass.classifyContour(contours.get(maxIndex).toArray(), img);
 						
 						// draw contour and output image to Frame
 						Imgproc.drawContours(img, contours, maxIndex, new Scalar(0,0,255), 2);
