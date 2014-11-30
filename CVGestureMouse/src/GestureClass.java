@@ -21,8 +21,8 @@ public class GestureClass {
 	private static final int LEFT_CLICK_MOVING_VALLEYS_MIN_THRESHOLD = 3;
 	private static final int LEFT_CLICK_MOVING_VALLEYS_MAX_THRESHOLD = 3;
 
-	private static final int X_MAX = 320;
-	private static final int Y_MAX = 240;
+	private static final int X_MAX = 640;
+	private static final int Y_MAX = 480;
 	private static final int IGNORE_EDGE_WIDTH = 5;
 
 	private static int frameNo = 0;
@@ -32,12 +32,12 @@ public class GestureClass {
 		this.position = null;
 	}
 
-	public GestureClass(int peaks, int valleys) {
-		this.name = getClass(peaks, valleys);
+	public GestureClass(int peaks, int valleys, ClassName previousClass) {
+		this.name = getClass(peaks, valleys, previousClass);
 		this.position = null;
 	}
 
-	public static GestureClass classifyContour(Point[] contour, Mat img) {
+	public static GestureClass classifyContour(Point[] contour, Mat img, ClassName previousClass, Point previousPos) {
 
 		int peaks = 0, valleys = 0;
 		int k = 25; // distance from center point for getting vectors
@@ -48,7 +48,7 @@ public class GestureClass {
 														// i-k,i and i,i+k
 		double peakThresh = 1.6; // positive angle threshold for peaks
 		double valleyThresh = -1.6; // negative angle threshold for valleys
-		Point pointLocation = new Point();
+		Point pointLocation = null;
 
 		for (int i = 0; i < contour.length / 2; i++) {
 			Point temp = contour[i];
@@ -102,7 +102,7 @@ public class GestureClass {
 						&& contour[i].x < (X_MAX - IGNORE_EDGE_WIDTH)
 						&& contour[i].y > IGNORE_EDGE_WIDTH
 						&& contour[i].y < (Y_MAX - IGNORE_EDGE_WIDTH)) {
-					Core.circle(img, contour[i], 8, new Scalar(255, 0, 0), 3);
+					Core.circle(img, contour[i], 16, new Scalar(255, 0, 0), 3);
 					peaks++;
 					peakList.add(contour[i]);
 				}
@@ -131,29 +131,29 @@ public class GestureClass {
 						&& contour[i].x < (X_MAX - IGNORE_EDGE_WIDTH)
 						&& contour[i].y > IGNORE_EDGE_WIDTH
 						&& contour[i].y < (Y_MAX - IGNORE_EDGE_WIDTH)) {
-					Core.circle(img, contour[i], 8, new Scalar(183, 255, 0), 2);
+					Core.circle(img, contour[i], 16, new Scalar(183, 255, 0), 2);
 					valleys++;
 				}
 
 			}
 
 			if (peakList.size() > 2) {
-				ArrayList<Double> peakX = new ArrayList<Double>();
+				ArrayList<Double> peakY = new ArrayList<Double>();
 				for (Point p : peakList) {
-					peakX.add(p.x);
+					peakY.add(p.y);
 				}
-				Collections.sort(peakX);
-				Double wantedX;
+				Collections.sort(peakY);
+				Double wantedY;
 				if (peaks == MOVING_PEAKS_MIN_THRESHOLD) {
-					wantedX = peakX.get(2);
+					wantedY = peakY.get(2);
 					for (Point p : peakList) {
-						if (p.x == wantedX)
+						if (p.y == wantedY)
 							pointLocation = p;
 					}
 				} else if (peaks == LEFT_CLICK_MOVING_PEAKS_MIN_THRESHOLD) {
-					wantedX = peakX.get(1);
+					wantedY = peakY.get(1);
 					for (Point p : peakList) {
-						if (p.x == wantedX)
+						if (p.y == wantedY)
 							pointLocation = p;
 					}
 				}
@@ -162,26 +162,26 @@ public class GestureClass {
 
 		}
 
-		// if (frameNo % 20 == 0) {
-		// System.out.println("Perimeter length: " + contour.length +
-		// ";    Peaks: " + peaks + ";    Valleys: " + valleys);
-		// //System.out.println(Arrays.toString(angles));
-		// }
 		frameNo++;
-		GestureClass result = new GestureClass(peaks, valleys);
+		GestureClass result = new GestureClass(peaks, valleys, previousClass);
 		if (result.name == ClassName.MOVING
 				|| result.name == ClassName.LEFT_CLICK_MOVING) {
-			result.position = pointLocation;
+			if (pointLocation == null) {
+				result.position = previousPos;
+			} else {
+				result.position = pointLocation;
+			}
 		}
 		return result;
 	}
 
-	private ClassName getClass(int peaks, int valleys) {
-		ClassName name = ClassName.GROUND;
+	private ClassName getClass(int peaks, int valleys, ClassName previousClass) {
 		if (peaks == MOVING_PEAKS_MIN_THRESHOLD)
 			name = ClassName.MOVING;
 		else if (peaks == LEFT_CLICK_MOVING_PEAKS_MIN_THRESHOLD)
 			name = ClassName.LEFT_CLICK_MOVING;
+		else
+			name = previousClass;
 		// if (peaks > POINT_PEAKS_MIN_THRESHOLD && peaks <
 		// POINT_PEAKS_MAX_THRESHOLD)
 		// name = ClassName.POINT;
