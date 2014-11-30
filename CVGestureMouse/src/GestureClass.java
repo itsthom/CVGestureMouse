@@ -1,134 +1,194 @@
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.Point;
 import org.opencv.core.Scalar;
 
-
 public class GestureClass {
-	
+
 	public ClassName name;
-	
-	private static final int POINT_PEAKS_MIN_THRESHOLD = 0;
-	private static final int POINT_PEAKS_MAX_THRESHOLD = 3;
-	private static final int REACH_PEAKS_MIN_THRESHOLD = 4;
-	private static final int REACH_VALLEYS_MIN_THRESHOLD = 4;
-	
+	public Point position;
+
+	private static final int MOVING_PEAKS_MIN_THRESHOLD = 5;
+	private static final int MOVING_PEAKS_MAX_THRESHOLD = 5;
+	private static final int LEFT_CLICK_MOVING_PEAKS_MIN_THRESHOLD = 4;
+	private static final int LEFT_CLICK_MOVING_PEAKS_MAX_THRESHOLD = 4;
+	private static final int MOVING_VALLEYS_MIN_THRESHOLD = 4;
+	private static final int MOVING_VALLEYS_MAX_THRESHOLD = 4;
+	private static final int LEFT_CLICK_MOVING_VALLEYS_MIN_THRESHOLD = 3;
+	private static final int LEFT_CLICK_MOVING_VALLEYS_MAX_THRESHOLD = 3;
+
+	private static final int X_MAX = 320;
+	private static final int Y_MAX = 240;
+	private static final int IGNORE_EDGE_WIDTH = 5;
+
 	private static int frameNo = 0;
-	
+
 	public GestureClass() {
 		this.name = ClassName.UNCLASSIFIED;
+		this.position = null;
 	}
-	
+
 	public GestureClass(int peaks, int valleys) {
 		this.name = getClass(peaks, valleys);
+		this.position = null;
 	}
-	
+
 	public static GestureClass classifyContour(Point[] contour, Mat img) {
-		// TODO classification doesn't work - may need to rewrite and adjust thresholds
+
 		int peaks = 0, valleys = 0;
 		int k = 25; // distance from center point for getting vectors
 		if (contour.length <= k)
 			return new GestureClass();
-		
-		double[] angles = new double[contour.length]; // angles between vectors i-k,i and i,i+k
+
+		double[] angles = new double[contour.length]; // angles between vectors
+														// i-k,i and i,i+k
 		double peakThresh = 1.6; // positive angle threshold for peaks
 		double valleyThresh = -1.6; // negative angle threshold for valleys
-		
-		for(int i = 0; i < contour.length / 2; i++){
+		Point pointLocation = new Point();
+
+		for (int i = 0; i < contour.length / 2; i++) {
 			Point temp = contour[i];
 			contour[i] = contour[contour.length - i - 1];
-			contour[contour.length - i -1] = temp;
+			contour[contour.length - i - 1] = temp;
 		}
-		
+
 		for (int i = 0; i < contour.length; i++) {
 			int a, b;
 			if (i < k)
-				a = contour.length - (k-i);
+				a = contour.length - (k - i);
 			else
-				a = i-k;
-			
+				a = i - k;
+
 			if (i >= (contour.length - k))
 				b = (i + k) % k;
 			else
-				b = i+k;
-			double ay = contour[i].y - contour[a].y , 
-					ax = contour[i].x - contour[a].x,
-					by = contour[b].y - contour[i].y, 
-					bx = contour[b].x - contour[i].x;
-			angles[i] = Math.atan2(ax*by - ay*bx, ax*bx + ay*by); //perp dot product
+				b = i + k;
+			double ay = contour[i].y - contour[a].y, ax = contour[i].x
+					- contour[a].x, by = contour[b].y - contour[i].y, bx = contour[b].x
+					- contour[i].x;
+			angles[i] = Math.atan2(ax * by - ay * bx, ax * bx + ay * by); // perp
+																			// dot
+																			// product
 		}
-		
+
 		int K = 25;
+		ArrayList<Point> peakList = new ArrayList<Point>();
 
 		for (int i = 0; i < angles.length; i++) {
 			if (angles[i] > peakThresh) {
 				boolean isMaxPeak = true;
 				int index = i - K;
-				for (int j = 0;j<2*K;j++){
-					if (index < 0){
-						if (angles[i] < angles[angles.length + index]){
+				for (int j = 0; j < 2 * K; j++) {
+					if (index < 0) {
+						if (angles[i] < angles[angles.length + index]) {
 							isMaxPeak = false;
 						}
-					} else if (index > angles.length - 1){
-						if (angles[i] < angles[index - angles.length]){
+					} else if (index > angles.length - 1) {
+						if (angles[i] < angles[index - angles.length]) {
 							isMaxPeak = false;
 						}
 					} else {
-						if (angles[i] < angles[index]){
+						if (angles[i] < angles[index]) {
 							isMaxPeak = false;
 						}
 					}
 					index++;
 				}
-				if (isMaxPeak){
-					Core.circle(img, contour[i], 15, new Scalar(255,0,0), 2);
+				if (isMaxPeak && contour[i].x > IGNORE_EDGE_WIDTH
+						&& contour[i].x < (X_MAX - IGNORE_EDGE_WIDTH)
+						&& contour[i].y > IGNORE_EDGE_WIDTH
+						&& contour[i].y < (Y_MAX - IGNORE_EDGE_WIDTH)) {
+					Core.circle(img, contour[i], 8, new Scalar(255, 0, 0), 3);
 					peaks++;
+					peakList.add(contour[i]);
 				}
 			}
-			
+
 			if (angles[i] < valleyThresh) {
 				boolean isMinValley = true;
 				int index = i - K;
-				for (int j = 0;j<2*K;j++){
-					if (index < 0){
-						if (angles[i] > angles[angles.length + index]){
+				for (int j = 0; j < 2 * K; j++) {
+					if (index < 0) {
+						if (angles[i] > angles[angles.length + index]) {
 							isMinValley = false;
 						}
-					} else if (index > angles.length - 1){
-						if (angles[i] > angles[index - angles.length]){
+					} else if (index > angles.length - 1) {
+						if (angles[i] > angles[index - angles.length]) {
 							isMinValley = false;
 						}
 					} else {
-						if (angles[i] > angles[index]){
+						if (angles[i] > angles[index]) {
 							isMinValley = false;
 						}
 					}
 					index++;
 				}
-				if (isMinValley){
-					Core.circle(img, contour[i], 15, new Scalar(0,255,0), 2);
+				if (isMinValley && contour[i].x > IGNORE_EDGE_WIDTH
+						&& contour[i].x < (X_MAX - IGNORE_EDGE_WIDTH)
+						&& contour[i].y > IGNORE_EDGE_WIDTH
+						&& contour[i].y < (Y_MAX - IGNORE_EDGE_WIDTH)) {
+					Core.circle(img, contour[i], 8, new Scalar(183, 255, 0), 2);
 					valleys++;
 				}
+
 			}
+
+			if (peakList.size() > 2) {
+				ArrayList<Double> peakX = new ArrayList<Double>();
+				for (Point p : peakList) {
+					peakX.add(p.x);
+				}
+				Collections.sort(peakX);
+				Double wantedX;
+				if (peaks == MOVING_PEAKS_MIN_THRESHOLD) {
+					wantedX = peakX.get(2);
+					for (Point p : peakList) {
+						if (p.x == wantedX)
+							pointLocation = p;
+					}
+				} else if (peaks == LEFT_CLICK_MOVING_PEAKS_MIN_THRESHOLD) {
+					wantedX = peakX.get(1);
+					for (Point p : peakList) {
+						if (p.x == wantedX)
+							pointLocation = p;
+					}
+				}
+
+			}
+
 		}
-		
-		if (frameNo % 20 == 0) {
-			System.out.println("Perimeter length: " + contour.length + ";    Peaks: " + peaks + ";    Valleys: " + valleys);
-			//System.out.println(Arrays.toString(angles));
-		}
+
+		// if (frameNo % 20 == 0) {
+		// System.out.println("Perimeter length: " + contour.length +
+		// ";    Peaks: " + peaks + ";    Valleys: " + valleys);
+		// //System.out.println(Arrays.toString(angles));
+		// }
 		frameNo++;
-		return new GestureClass(peaks, valleys);
+		GestureClass result = new GestureClass(peaks, valleys);
+		if (result.name == ClassName.MOVING
+				|| result.name == ClassName.LEFT_CLICK_MOVING) {
+			result.position = pointLocation;
+		}
+		return result;
 	}
-	
+
 	private ClassName getClass(int peaks, int valleys) {
 		ClassName name = ClassName.GROUND;
-		if (peaks > POINT_PEAKS_MIN_THRESHOLD && peaks < POINT_PEAKS_MAX_THRESHOLD)
-			name = ClassName.POINT;
-		else if (peaks > REACH_PEAKS_MIN_THRESHOLD || valleys > REACH_VALLEYS_MIN_THRESHOLD)
-			name = ClassName.REACH;
+		if (peaks == MOVING_PEAKS_MIN_THRESHOLD)
+			name = ClassName.MOVING;
+		else if (peaks == LEFT_CLICK_MOVING_PEAKS_MIN_THRESHOLD)
+			name = ClassName.LEFT_CLICK_MOVING;
+		// if (peaks > POINT_PEAKS_MIN_THRESHOLD && peaks <
+		// POINT_PEAKS_MAX_THRESHOLD)
+		// name = ClassName.POINT;
+		// else if (peaks > REACH_PEAKS_MIN_THRESHOLD || valleys >
+		// REACH_VALLEYS_MIN_THRESHOLD)
+		// name = ClassName.REACH;
 		return name;
 	}
-	
+
 }

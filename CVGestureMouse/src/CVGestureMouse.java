@@ -1,3 +1,4 @@
+import java.awt.AWTException;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 
@@ -25,7 +26,7 @@ public class CVGestureMouse {
 		// Set up opservation frame
 		JFrame frame = new JFrame("Webcam Capture");
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		frame.setSize(360, 280);
+		frame.setSize(700, 700);
 		CameraViewPanel facePanel = new CameraViewPanel();
 		frame.setContentPane(facePanel);
 		
@@ -40,18 +41,20 @@ public class CVGestureMouse {
 			System.out.println("found webmcam: " + webCam.toString());
 		}
 		
-		
 		// Open and read from video stream
 		if (webCam.isOpened()) {
 			Thread.sleep(500); // Delay to allow camera initialization
 			int frameNo = 0;
+			double pointAreaMin = 10000;
+			double pointAreaMax = 0;
 			frame.setVisible(true);
 			
 			Mat img = new Mat();
 			Mat imgGray = new Mat();
 			Mat imgBinary = new Mat();
-			MatToBufImg matToBufferedImageConverter = new MatToBufImg(); // converts Mat to Java BufferedImage for display
+			MatToBufImg matToBufferedImageConverter = new MatToBufImg();
 			GestureClass currentClass;
+			GestureClass previousClass = new GestureClass();
 			Mouse mouse = new Mouse(CAPTURE_WIDTH, CAPTURE_HEIGHT);
 			
 			while (true) {
@@ -84,9 +87,35 @@ public class CVGestureMouse {
 						// Classify
 						currentClass = GestureClass.classifyContour(contours.get(maxIndex).toArray(), img);
 						
+						if (previousClass.name == ClassName.MOVING && currentClass.name == ClassName.LEFT_CLICK_MOVING) {
+							mouse.leftClick();
+						}
+						if (previousClass.name == ClassName.LEFT_CLICK_MOVING && currentClass.name == ClassName.MOVING) {
+							mouse.leftButtonRelease();
+						}
+						
+						previousClass = currentClass;
+						
 						// draw contour and output image to Frame
-						Imgproc.drawContours(img, contours, maxIndex, new Scalar(0,0,255), 2);
-						Core.putText(img, currentClass.name.name(), new Point(5.0,30.0), Core.FONT_HERSHEY_SIMPLEX, 1.0, new Scalar(0,0,255), 2);
+						Imgproc.drawContours(img, contours, maxIndex, new Scalar(72,0,255), 2);
+						Core.putText(img, currentClass.name.name(), new Point(5.0,30.0), Core.FONT_HERSHEY_SIMPLEX, 1.0, new Scalar(72,0,255), 2);
+						
+						// draw coordinates on img for Point gesture, move mouse cursor
+						if (currentClass.name == ClassName.MOVING || currentClass.name == ClassName.LEFT_CLICK_MOVING) {
+							String pos = "X: " + currentClass.position.x + " Y: " + currentClass.position.y;
+							Core.putText(img, pos, new Point(5.0,42.0), Core.FONT_HERSHEY_SIMPLEX, 0.35, new Scalar(72,0,255), 1);
+							
+							// Using contour area to determine mouse Y
+//							if (maxArea > pointAreaMax)
+//								pointAreaMax = maxArea;
+//							if (maxArea < pointAreaMin)
+//								pointAreaMin = maxArea;
+//							double y = (double) CAPTURE_HEIGHT - Math.floor((maxArea - pointAreaMin) / (pointAreaMax - pointAreaMin) * CAPTURE_HEIGHT + 1);
+//							mouse.moveMouse(currentClass.position.x, y);
+							
+							// Using image Y to determine mouse Y
+							mouse.moveMouse(currentClass.position.x, currentClass.position.y);
+						}
 						
 					}
 					
