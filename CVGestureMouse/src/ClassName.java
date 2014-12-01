@@ -1,6 +1,7 @@
 
 public enum ClassName {
-	MOVING, // whole hand, moves cursor 
-	LEFT_CLICK_MOVING,
-	POINT, REACH, GROUND, UNCLASSIFIED
+	MOVING, // index and thumb, index moves cursor 
+	LEFT_CLICK_MOVING, // index only, index moves cursor
+	STOP, // whole hand, cursor does not move
+	UNCLASSIFIED // nothing classified
 }

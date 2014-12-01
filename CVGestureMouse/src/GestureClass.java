@@ -4,6 +4,7 @@ import java.util.Collections;
 
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfPoint;
 import org.opencv.core.Point;
 import org.opencv.core.Scalar;
 
@@ -12,20 +13,24 @@ public class GestureClass {
 	public ClassName name;
 	public Point position;
 
-	private static final int MOVING_PEAKS_MIN_THRESHOLD = 5;
-	private static final int MOVING_PEAKS_MAX_THRESHOLD = 5;
-	private static final int LEFT_CLICK_MOVING_PEAKS_MIN_THRESHOLD = 4;
-	private static final int LEFT_CLICK_MOVING_PEAKS_MAX_THRESHOLD = 4;
-	private static final int MOVING_VALLEYS_MIN_THRESHOLD = 4;
-	private static final int MOVING_VALLEYS_MAX_THRESHOLD = 4;
-	private static final int LEFT_CLICK_MOVING_VALLEYS_MIN_THRESHOLD = 3;
-	private static final int LEFT_CLICK_MOVING_VALLEYS_MAX_THRESHOLD = 3;
+	private static final double PK_THRESH_RADS = 1.6;
+	private static final double VL_THRESH_RADS = -1.6;
+	
+	private static final int LCLICK_MOV_PK_MIN_THRESH = 1;
+	private static final int LCLICK_MOV_PK_MAX_THRESH = 1;
+	private static final int LCLICK_MOV_VL_MIN_THRESH = 0;
+	private static final int LCLICK_MOV_VL_MAX_THRESH = 1;
+	private static final int MOV_PK_MIN_THRESH = 2;
+	private static final int MOV_PK_MAX_THRESH = 2;
+	private static final int MOV_VL_MIN_THRESH = 1;
+	private static final int MOV_VL_MAX_THRESH = 2;
+	private static final int STOP_PK_MIN_THRESH = 3;
+	private static final int STOP_VL_MIN_THRESH = 3;
 
 	private static final int X_MAX = 640;
 	private static final int Y_MAX = 480;
 	private static final int IGNORE_EDGE_WIDTH = 5;
 
-	private static int frameNo = 0;
 
 	public GestureClass() {
 		this.name = ClassName.UNCLASSIFIED;
@@ -40,14 +45,15 @@ public class GestureClass {
 	public static GestureClass classifyContour(Point[] contour, Mat img, ClassName previousClass, Point previousPos) {
 
 		int peaks = 0, valleys = 0;
-		int k = 25; // distance from center point for getting vectors
+		int k = 50; // distance from center point for getting vectors
+		int K = 75; // distance from center point for getting neighborhood
+		
 		if (contour.length <= k)
 			return new GestureClass();
-
-		double[] angles = new double[contour.length]; // angles between vectors
-														// i-k,i and i,i+k
-		double peakThresh = 1.6; // positive angle threshold for peaks
-		double valleyThresh = -1.6; // negative angle threshold for valleys
+		
+		// angles between vectors i-k,i and i,i+k
+		double[] angles = new double[contour.length]; 
+		
 		Point pointLocation = null;
 
 		for (int i = 0; i < contour.length / 2; i++) {
@@ -67,19 +73,19 @@ public class GestureClass {
 				b = (i + k) % k;
 			else
 				b = i + k;
-			double ay = contour[i].y - contour[a].y, ax = contour[i].x
-					- contour[a].x, by = contour[b].y - contour[i].y, bx = contour[b].x
-					- contour[i].x;
-			angles[i] = Math.atan2(ax * by - ay * bx, ax * bx + ay * by); // perp
-																			// dot
-																			// product
+			double ay = contour[i].y - contour[a].y,
+					ax = contour[i].x - contour[a].x,
+					by = contour[b].y - contour[i].y,
+					bx = contour[b].x - contour[i].x;
+			// perp dot product
+			angles[i] = Math.atan2(ax * by - ay * bx, ax * bx + ay * by);
 		}
 
-		int K = 25;
+		
 		ArrayList<Point> peakList = new ArrayList<Point>();
 
 		for (int i = 0; i < angles.length; i++) {
-			if (angles[i] > peakThresh) {
+			if (angles[i] > PK_THRESH_RADS) {
 				boolean isMaxPeak = true;
 				int index = i - K;
 				for (int j = 0; j < 2 * K; j++) {
@@ -108,7 +114,7 @@ public class GestureClass {
 				}
 			}
 
-			if (angles[i] < valleyThresh) {
+			if (angles[i] < VL_THRESH_RADS) {
 				boolean isMinValley = true;
 				int index = i - K;
 				for (int j = 0; j < 2 * K; j++) {
@@ -137,57 +143,40 @@ public class GestureClass {
 
 			}
 
-			if (peakList.size() > 2) {
-				ArrayList<Double> peakY = new ArrayList<Double>();
-				for (Point p : peakList) {
-					peakY.add(p.y);
-				}
-				Collections.sort(peakY);
-				Double wantedY;
-				if (peaks == MOVING_PEAKS_MIN_THRESHOLD) {
-					wantedY = peakY.get(2);
-					for (Point p : peakList) {
-						if (p.y == wantedY)
-							pointLocation = p;
-					}
-				} else if (peaks == LEFT_CLICK_MOVING_PEAKS_MIN_THRESHOLD) {
-					wantedY = peakY.get(1);
-					for (Point p : peakList) {
-						if (p.y == wantedY)
-							pointLocation = p;
-					}
-				}
-
+			if (peakList.size() == 1) {
+				pointLocation = peakList.get(0);
+			} else if (peakList.size() == 2) {
+				pointLocation = (peakList.get(0).y > peakList.get(1).y) ? peakList.get(1) : peakList.get(0);
+			} else {
+				pointLocation = previousPos;
 			}
 
 		}
 
-		frameNo++;
 		GestureClass result = new GestureClass(peaks, valleys, previousClass);
 		if (result.name == ClassName.MOVING
 				|| result.name == ClassName.LEFT_CLICK_MOVING) {
-			if (pointLocation == null) {
-				result.position = previousPos;
-			} else {
-				result.position = pointLocation;
-			}
+			result.position = (pointLocation == null) ? previousPos : pointLocation;
 		}
 		return result;
 	}
 
 	private ClassName getClass(int peaks, int valleys, ClassName previousClass) {
-		if (peaks == MOVING_PEAKS_MIN_THRESHOLD)
+		if (peaks >= MOV_PK_MIN_THRESH
+				&& peaks <= MOV_PK_MAX_THRESH
+				&& valleys >= MOV_VL_MIN_THRESH
+				&& valleys <= MOV_VL_MAX_THRESH)
 			name = ClassName.MOVING;
-		else if (peaks == LEFT_CLICK_MOVING_PEAKS_MIN_THRESHOLD)
+		else if (peaks >= LCLICK_MOV_PK_MIN_THRESH
+				&& peaks <= LCLICK_MOV_PK_MAX_THRESH
+				&& valleys >= LCLICK_MOV_VL_MIN_THRESH
+				&& valleys <= LCLICK_MOV_VL_MAX_THRESH)
 			name = ClassName.LEFT_CLICK_MOVING;
+		else if (peaks >= STOP_PK_MIN_THRESH
+				&& valleys >= STOP_VL_MIN_THRESH)
+			name = ClassName.STOP;
 		else
 			name = previousClass;
-		// if (peaks > POINT_PEAKS_MIN_THRESHOLD && peaks <
-		// POINT_PEAKS_MAX_THRESHOLD)
-		// name = ClassName.POINT;
-		// else if (peaks > REACH_PEAKS_MIN_THRESHOLD || valleys >
-		// REACH_VALLEYS_MIN_THRESHOLD)
-		// name = ClassName.REACH;
 		return name;
 	}
 

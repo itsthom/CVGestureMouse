@@ -20,6 +20,7 @@ public class CVGestureMouse {
 
 	private static final int CAPTURE_WIDTH = 640;
 	private static final int CAPTURE_HEIGHT = 480;
+	private static final int MIN_CONTOUR_SIZE = 300;
 
 	public static void main(String[] args) throws Exception {
 
@@ -43,7 +44,8 @@ public class CVGestureMouse {
 
 		// Open and read from video stream
 		if (webCam.isOpened()) {
-			Thread.sleep(500); // Delay to allow camera initialization
+			// Delay to allow camera initialization
+			Thread.sleep(500);
 			frame.setVisible(true);
 
 			Mat img = new Mat();
@@ -68,22 +70,19 @@ public class CVGestureMouse {
 					ArrayList<MatOfPoint> contours = new ArrayList<MatOfPoint>();
 					Mat hierarchy = new Mat();
 
-					// find contours, then find max contour
-					// TODO - instead of finding the largest region, find the one based on perimeter length that's in "hand range"
+					// find contours, then first one that might be a hand
 					Imgproc.findContours(imgBinary, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
 					if (contours.size() > 0) {
-						double maxArea = 0.0;
-						int maxIndex = 0;
+						int index = 0;
 						for (int i=0; i < contours.size(); i++) {
-							double area = Imgproc.contourArea(contours.get(i));
-							if (area > maxArea) {
-								maxArea = area;
-								maxIndex = i;
+							if (contours.get(i).toArray().length > MIN_CONTOUR_SIZE) {
+								index = i;
+								break;
 							}
 						}
 
 						// Classify
-						currentClass = GestureClass.classifyContour(contours.get(maxIndex).toArray(), img, previousClass.name, previousPos);
+						currentClass = GestureClass.classifyContour(contours.get(index).toArray(), img, previousClass.name, previousPos);
 
 						if (previousClass.name == ClassName.MOVING && currentClass.name == ClassName.LEFT_CLICK_MOVING) {
 							mouse.leftClick();
@@ -95,13 +94,13 @@ public class CVGestureMouse {
 						previousClass = currentClass;
 
 						// draw contour and output image to Frame
-						Imgproc.drawContours(img, contours, maxIndex, new Scalar(72,0,255), 2);
+						Imgproc.drawContours(img, contours, index, new Scalar(72,0,255), 2);
 						Core.putText(img, currentClass.name.name(), new Point(5.0,30.0), Core.FONT_HERSHEY_SIMPLEX, 1.0, new Scalar(72,0,255), 2);
 
-						// draw coordinates on img for Point gesture, move mouse cursor
+						// move cursor for moving classes
 						if (currentClass.name == ClassName.MOVING || currentClass.name == ClassName.LEFT_CLICK_MOVING) {
-							String pos = "X: " + currentClass.position.x + " Y: " + currentClass.position.y;
-							Core.putText(img, pos, new Point(5.0,42.0), Core.FONT_HERSHEY_SIMPLEX, 0.35, new Scalar(72,0,255), 1);
+//							String pos = "X: " + currentClass.position.x + " Y: " + currentClass.position.y;
+//							Core.putText(img, pos, new Point(5.0,42.0), Core.FONT_HERSHEY_SIMPLEX, 0.35, new Scalar(72,0,255), 1);
 							currentPos = currentClass.position;
 							mouse.moveMouse(currentPos.x, currentPos.y);
 							previousPos = currentPos;
@@ -125,7 +124,5 @@ public class CVGestureMouse {
 		webCam.release();
 
 	}
-
-
 
 }
